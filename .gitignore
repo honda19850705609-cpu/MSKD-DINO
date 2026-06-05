@@ -1,0 +1,32 @@
+# Model weights & exported models (too large for git; keep out of version control)
+*.pth
+*.pt
+*.onnx
+*.engine
+*.trt
+
+# Python cache / build artifacts
+__pycache__/
+*.py[cod]
+*.egg-info/
+*.egg
+build/
+dist/
+.eggs/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Data & outputs
+*.jpg
+*.jpeg
+*.png
+!figs/*.jpg
+datasets/data/
+outputs/
+logs/*.log
+
+# Env / system
+.DS_Store
+.vscode/
+*.swp
