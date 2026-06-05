@@ -1,29 +1,79 @@
-# MSKD-DINO — Deployment & Optimization for VisDrone Detection
+# MSKD-DINO — Accuracy-then-Compression for Dense Small-Object Aerial Detection
 
-Deployment-side work for a DINO-DETR detector trained on VisDrone (dense small-object
-aerial detection). This repository contains the scripts and notes for taking a trained
-DINO-DETR checkpoint through an end-to-end deployment pipeline:
+A full research pipeline built on **DINO-DETR** for dense, small-object detection on
+**VisDrone** (10 classes, ~6,500 aerial images). The project follows a single
+end-to-end thesis: **first push accuracy, then distill and compress, then deploy** —
 
 ```
-PyTorch  ->  ONNX  ->  TensorRT
+Accuracy boost  ->  Knowledge distillation  ->  Lightweighting  ->  ONNX / FP16 deployment
 ```
 
-The detector itself is a 5-scale DINO with a ResNet-50 backbone and several
-modifications (BiFPN neck, P2 high-resolution level, channel attention, SIoU loss,
-VisDrone class weighting), trained for 10 VisDrone classes.
+The goal is to test whether an *accuracy-first, compression-second* route is effective on
+a Transformer detector, rather than compressing a weak baseline from the start.
 
-> This repo holds the **deployment scripts and documentation**, not the full DINO
-> training codebase or model weights. The base detector builds on the IDEA-Research
-> DINO codebase.
+> **Attribution.** This work builds on the [IDEA-Research/DINO](https://github.com/IDEA-Research/DINO)
+> codebase (Apache-2.0). The base detector, training engine, and deformable-attention op
+> originate there. All VisDrone-specific architecture changes, the distillation pipeline,
+> the lightweight student configs, and the deployment scripts in this repo are my own
+> additions on top of that base. See `LICENSE` and the original repository for the base license.
 
-## Contents
+---
 
-| File | Purpose |
+## What I changed
+
+**Accuracy (architecture + loss + training).** Added a **P2 high-resolution feature level**
+and a **5-scale** input, a **BiFPN** bidirectional feature pyramid, and **channel attention**
+in the encoder. On the loss side, replaced GIoU with **SIoU** and applied a
+**class-weighted Focal Loss** for VisDrone's long-tail distribution. Training used
+**Mosaic + directed Copy-Paste + imaging-degradation** augmentation, a
+`WeightedRandomSampler` for long-tail classes, and **EMA** (α=0.9997) for stability.
+
+**Knowledge distillation & lightweighting.** Used the high-accuracy model as a teacher and
+trained a student via **logits KL distillation**, while compressing the Transformer
+encoder/decoder depth, FFN width, and BiFPN depth.
+
+**Deployment.** Verified real-device inference and exported to ONNX; see the engineering
+notes below for the non-obvious problems encountered on Blackwell-generation GPUs.
+
+---
+
+## Key results
+
+| Stage | Metric | Result |
+|-------|--------|--------|
+| Accuracy boost (vs. baseline) | mAP / AP50 / APs | **+0.046 / +0.073 / +0.065** |
+| Accuracy boost | core-class F1 | **0.640 → 0.712** |
+| Student (after distill + compress) | params / GFLOPs | **−21.5% / −43%** |
+| Student | mAP / AP50 / APs | **0.320 / 0.557 / 0.245** (clearly above baseline and compression-only ablation) |
+| Deployment (FP16, 1333×800) | FPS | **33.4 → 45.8 (+37.2%)** |
+| Deployment | end-to-end speedup vs. FP32 | **1.82×** (1333×800), **1.92×** (2000×1200) |
+
+The student keeps most of the teacher's accuracy at a fraction of the cost, supporting the
+accuracy-first-then-compress hypothesis. See `figs/` for training curves and the comparison table.
+
+---
+
+## Repository layout
+
+| Path | Purpose |
 |------|---------|
-| `verify_inference.py` | Build the model from its training config, load the checkpoint, run one PyTorch inference and print detections. |
-| `export_onnx.py` | Export the model to ONNX (opset 17), with dynamic spatial axes, and validate the ONNX output against PyTorch. |
-| `setup_dino.sh` | Reproducible environment setup (CUDA paths, dependencies, deformable-attention build). |
-| `logs/` | Daily engineering logs documenting the process, problems, and fixes. |
+| `main.py`, `engine.py` | Training / evaluation entry point and loop. |
+| `config/DINO/` | DINO configs, including the VisDrone thesis / lightweight / structural variants. |
+| `models/dino/` | Detector, with my additions: `bifpn_neck.py`, channel attention, deformable transformer. |
+| `models/dino/ops/` | Multi-scale deformable-attention op (CUDA source + pure-PyTorch fallback). |
+| `datasets/` | Data pipeline, incl. `copy_paste.py`, `coco_balance.py`, VisDrone transforms. |
+| `tools/` | Training menu, metric plotting, VisDrone→COCO conversion, prediction visualization. |
+| `util/` | Metrics (`thesis_metrics.py`, `prf1_metrics.py`), GPU-adaptive helpers, logging. |
+| `verify_inference.py` | Build model from config, load checkpoint, run one PyTorch inference. |
+| `export_onnx.py` | Export to ONNX (opset 17, dynamic spatial axes) and validate vs. PyTorch. |
+| `figs/` | Framework diagram, training curves, comparison table. |
+| `logs/` | Daily engineering logs (process, problems, fixes). |
+
+> Model weights (`*.pth`), the compiled deformable-attention `.so`, and the VisDrone dataset
+> are **not** tracked here (see `.gitignore`). The `.so` is platform/Python-version specific and
+> must be rebuilt locally.
+
+---
 
 ## Key engineering notes
 
@@ -32,32 +82,41 @@ VisDrone class weighting), trained for 10 VisDrone classes.
   (signature changed in torch 2.8), and downgrading torch conflicts with the GPU's
   required CUDA 12.8 toolkit. Resolved by bypassing the compiled op and forcing the
   pure-PyTorch `grid_sample`-based path — which is also what ONNX export requires.
-
 - **ONNX export of a large DETR graph.** The 1200-query / 5-scale graph segfaults during
   ONNX writing under GPU memory pressure with constant folding on. Exporting on CPU with
   `do_constant_folding=False` is a reliable fallback. Output validated via `onnx.checker`
   and ONNXRuntime (shapes and logit ranges match PyTorch).
 
-## Status
+---
 
-- [x] PyTorch inference verified (219 detections on a VisDrone aerial image)
-- [x] ONNX export validated (onnx.checker OK, ONNXRuntime matches PyTorch)
-- [ ] TensorRT engine + before/after comparison table (AP/F1, latency, size, VRAM)
-
-## Usage
-
-Run from the DINO project root (where `main.py` lives), after placing these scripts there:
+## Reproducing
 
 ```bash
-# 1. environment
+# 1. environment (CUDA paths, deps, deformable-attention build)
 bash setup_dino.sh
 
-# 2. verify the model loads and runs
-python verify_inference.py
+# 2. train (edit the VisDrone config + data path first)
+bash scripts/DINO_train.sh   # or use tools/run_visdrone_training_menu.py
 
-# 3. export and validate ONNX
+# 3. evaluate
+bash scripts/DINO_eval.sh
+
+# 4. deployment: verify + export ONNX
+python verify_inference.py
 python export_onnx.py
 ```
 
-Edit the paths at the top of each script (`CONFIG_PATH`, `CKPT_PATH`, `IMAGE_PATH`,
-`ONNX_PATH`) to match your environment.
+Set the dataset path and config in the relevant `config/DINO/DINO_*_visdrone_*.py` file,
+and edit the path constants at the top of `verify_inference.py` / `export_onnx.py`.
+
+## Status
+
+- [x] Accuracy-boost training pipeline (P2 / 5-scale / BiFPN / SIoU / Focal / aug)
+- [x] Knowledge distillation + lightweight student
+- [x] PyTorch inference verified; ONNX export validated (onnx.checker OK, ORT matches PyTorch)
+- [ ] TensorRT engine + before/after table (AP/F1, latency, size, VRAM)
+
+## License
+
+Code in this repository follows the license of the upstream
+[IDEA-Research/DINO](https://github.com/IDEA-Research/DINO) project (Apache-2.0); see `LICENSE`.
