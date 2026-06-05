@@ -1,0 +1,38 @@
+================================================================================
+DINO 依赖：在 Anaconda 里安装（推荐用「Anaconda Prompt」打开下面命令）
+================================================================================
+
+1) 激活环境（把 uav 换成你的环境名）
+   conda activate uav
+
+2) 若普通 cmd 里没有 conda，先执行（路径按你电脑上的 Anaconda 安装位置改）：
+   call D:\English\Anaconda\Scripts\activate.bat uav
+
+3) 安装 PyTorch（CUDA 12.8，适合 RTX 50 系 + cu128）
+   conda install pytorch torchvision torchaudio pytorch-cuda=12.8 -c pytorch -c nvidia -y
+
+   若你更习惯用 pip 装同一套 cu128 轮子，可改用：
+   pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu128
+
+4) 其余包（conda-forge + pip）
+   conda install -c conda-forge cython pycocotools scipy -y
+   pip install submitit termcolor addict yapf timm ninja
+
+5) 编译 DINO 的 CUDA 算子 MultiScaleDeformableAttention（必须在「带 MSVC 的环境」里执行，纯 conda 无法替代）
+   - 用资源管理器进文件夹，双击运行：
+     models\dino\ops\install_with_vs_env.bat
+   - 或在已安装「使用 C++ 的桌面开发」的前提下，打开「x64 Native Tools Command Prompt for VS」，
+     再 activate uav，然后：
+     cd /d 本仓库\models\dino\ops
+     set DISTUTILS_USE_SDK=1
+     set TORCH_CUDA_ARCH_LIST=12.0
+     pip install -e . --no-build-isolation
+
+6) 自检
+   python -c "import torch; print(torch.__version__, torch.cuda.is_available())"
+   cd /d 本仓库\models\dino\ops
+   python test.py
+
+================================================================================
+说明：第 5 步不是 conda 包，必须用本机 Visual Studio C++ + CUDA Toolkit(nvcc) 编译一次。
+================================================================================

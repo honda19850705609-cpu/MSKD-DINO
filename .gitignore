@@ -1,32 +1,33 @@
-# Model weights & exported models (too large for git; keep out of version control)
+# 权重 / 模型
 *.pth
 *.pt
 *.onnx
 *.engine
-*.trt
+*.ckpt
 
-# Python cache / build artifacts
+# 编译产物(关键:挡住那个 12MB 的 .so)
+*.so
+*.o
+*.a
+build/
+*.egg-info/
+
+# Python 缓存
 __pycache__/
 *.py[cod]
-*.egg-info/
-*.egg
-build/
-dist/
-.eggs/
-
-# Jupyter
 .ipynb_checkpoints/
 
-# Data & outputs
-*.jpg
-*.jpeg
-*.png
-!figs/*.jpg
-datasets/data/
-outputs/
-logs/*.log
-
-# Env / system
-.DS_Store
+# 编辑器 / 系统
 .vscode/
-*.swp
+.idea/
+.DS_Store
+
+# 数据集 / 输出(按需调整)
+data/
+datasets/visdrone/
+*.log
+outputs/
+work_dirs/
+
+# notebook 大输出(可选,先注释,看你要不要传)
+# *.ipynb

@@ -1,0 +1,36 @@
+# =============================================================================
+# DINO-DETR — pip 依赖（不含 PyTorch / torchvision，须单独按 CUDA 安装）
+# =============================================================================
+# 推荐顺序（详见仓库根目录 INSTALL_CONDA.txt）：
+#   1) 先装 torch + torchvision + torchaudio（与 CUDA 版本一致）
+#      conda: conda install pytorch torchvision torchaudio pytorch-cuda=12.8 -c pytorch -c nvidia
+#      pip:  pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu128
+#   2) 再执行: pip install -r requirements.txt
+# =============================================================================
+
+# --- Build / CUDA extension helpers ---
+cython>=0.29.0
+ninja
+
+# --- COCO ---
+# Windows 若 pip 失败可改用: conda install -c conda-forge pycocotools
+pycocotools>=2.0.2
+
+# --- Images & augmentations (ToTensor/Normalize + PIL blur + scipy motion blur) ---
+numpy>=1.19
+Pillow>=8.0
+scipy>=1.6
+
+# --- Training & modeling ---
+submitit
+termcolor
+addict
+yapf
+timm
+
+# --- Optional: COCO panoptic (needs GitHub) ---
+# pip install "git+https://github.com/cocodataset/panopticapi.git#egg=panopticapi"
+
+# --- DINO deformable attention: compile after MSVC + nvcc ---
+# models\dino\ops\install_with_vs_env.bat
+#   或: set DISTUTILS_USE_SDK=1 && pip install -e models/dino/ops --no-build-isolation

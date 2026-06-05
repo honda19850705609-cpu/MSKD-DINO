@@ -1,0 +1,3 @@
+这些 PNG 为 matplotlib 生成的示意图，不是 DINO 在 VisDrone 上的真实推理结果。
+要生成真实预测图，请在安装 PyTorch 的环境中运行:
+  python tools/visdrone_draw_predictions.py --random_sample --draw_gt ...
