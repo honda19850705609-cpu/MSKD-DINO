@@ -92,22 +92,31 @@ accuracy-first-then-compress hypothesis. See `figs/` for training curves and the
 ## Reproducing
 
 ```bash
-# 1. environment (CUDA paths, deps, deformable-attention build)
-bash setup_dino.sh
+# 1. environment
+# Follow INSTALL_CONDA.txt to install PyTorch, dependencies, and the
+# MultiScaleDeformableAttention op for your CUDA / Visual Studio setup.
 
-# 2. train (edit the VisDrone config + data path first)
-bash scripts/DINO_train.sh   # or use tools/run_visdrone_training_menu.py
+# 2. train on VisDrone converted to COCO format
+bash scripts/DINO_train.sh /path/to/visdrone_coco
 
 # 3. evaluate
-bash scripts/DINO_eval.sh
+bash scripts/DINO_eval.sh /path/to/visdrone_coco /path/to/checkpoint.pth
 
 # 4. deployment: verify + export ONNX
-python verify_inference.py
-python export_onnx.py
+python verify_inference.py \
+  --checkpoint /path/to/checkpoint.pth \
+  --image /path/to/test.jpg
+
+python export_onnx.py \
+  --checkpoint /path/to/checkpoint.pth \
+  --output outputs/dino_visdrone.onnx
 ```
 
-Set the dataset path and config in the relevant `config/DINO/DINO_*_visdrone_*.py` file,
-and edit the path constants at the top of `verify_inference.py` / `export_onnx.py`.
+The train / eval scripts default to `config/DINO/DINO_5scale_visdrone_final.py`.
+Pass a second argument to `scripts/DINO_train.sh` or a third argument to
+`scripts/DINO_eval.sh` if you want to run another config. Model weights and the
+VisDrone dataset are intentionally not tracked, so the reported numbers should be
+treated as experiment results from my local runs unless you retrain with the same setup.
 
 ## Status
 
