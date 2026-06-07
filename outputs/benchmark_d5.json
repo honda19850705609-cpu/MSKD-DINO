@@ -1,0 +1,34 @@
+{
+  "device": "RTX 5090",
+  "input_shape": [
+    1,
+    3,
+    800,
+    1333
+  ],
+  "iters": 50,
+  "warmup": 10,
+  "engines": {
+    "pytorch_fp32": {
+      "latency_ms_mean": 65.424,
+      "latency_ms_std": 2.877,
+      "fps": 15.28
+    },
+    "onnxruntime_cuda": {
+      "latency_ms_mean": 50.158,
+      "latency_ms_std": 3.132,
+      "fps": 19.94,
+      "model_size_mb": 149.7,
+      "providers": [
+        "CUDAExecutionProvider",
+        "CPUExecutionProvider"
+      ]
+    }
+  },
+  "ort_vs_pytorch_speedup": 1.304,
+  "accuracy_check": {
+    "max_logits_diff": 10.454175,
+    "max_boxes_diff": 0.994997,
+    "note": "Large diff under a real (non-export) input reveals an ONNX export-fidelity gap, not a runtime bug: trace-based export freezes DINO's data-dependent ops (topk query-selection, dynamic shapes). Latency numbers are valid; accuracy alignment needs a corrected export (preserve TopK / dynamo export / export-friendly forward) -- deferred to D13."
+  }
+}

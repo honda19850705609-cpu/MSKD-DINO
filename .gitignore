@@ -31,3 +31,9 @@ work_dirs/
 
 # notebook 大输出(可选,先注释,看你要不要传)
 # *.ipynb
+
+# build artifacts from compiling the deformable-attention CUDA op
+models/dino/ops/dist/
+models/dino/ops/build/
+*.egg-info/
+*.egg
